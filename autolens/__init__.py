@@ -88,6 +88,8 @@ from . import aggregator as agg
 from .analysis import model_util
 from .lens import subhalo
 from .lens.tracer import Tracer
+from .lens.tracer_los import TracerLOS
+from .lens.line_of_sight_shear import LineOfSightShear, LineOfSightShearMinimal
 from .lens.sensitivity import SubhaloSensitivityResult
 from .lens.to_inversion import TracerToInversion
 from .analysis.positions import PositionsLH

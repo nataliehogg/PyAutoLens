@@ -1,5 +1,9 @@
 jax:
-  use_jax: true                       # If True, uses JAX internally, whereas False uses normal Numpy.
+  use_jax: false                      # If True, uses JAX internally, whereas False uses normal Numpy.
+numba:
+  cache: false
+  nopython: true
+  parallel: false
 output:
   fit_dill: false
 test:

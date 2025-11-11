@@ -29,7 +29,10 @@ from autoarray.inversion.pixelization.border_relocator import BorderRelocator
 from autoarray.operators.transformer import TransformerDFT
 from autoarray.operators.transformer import TransformerNUFFT
 from autoarray.preloads import Preloads
-from autoarray.preloads import mapper_indices_from
+try:  # pragma: no cover - compatibility shim for older autoarray releases
+    from autoarray.preloads import mapper_indices_from
+except ImportError:  # pragma: no cover
+    mapper_indices_from = None
 from autoarray.structures.arrays.uniform_1d import Array1D
 from autoarray.structures.arrays.uniform_2d import Array2D
 from autoarray.structures.arrays.rgb import Array2DRGB
@@ -89,6 +92,7 @@ from . import aggregator as agg
 from .analysis import model_util
 from .lens import subhalo
 from .lens.tracer import Tracer
+from .lens.line_of_sight import LineOfSight, LineOfSightMinimal
 from .lens.sensitivity import SubhaloSensitivityResult
 from .lens.to_inversion import TracerToInversion
 from .analysis.positions import PositionsLH

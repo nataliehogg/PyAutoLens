@@ -78,7 +78,11 @@ def _tracer_from(
 
             galaxies.subhalo.mass.centre = tuple(subhalo_centre.in_list[0])
 
-        tracer = Tracer(galaxies=galaxies, cosmology=cosmology)
+        line_of_sight = getattr(instance, "line_of_sight", None)
+
+        tracer = Tracer(
+            galaxies=galaxies, cosmology=cosmology, line_of_sight=line_of_sight
+        )
 
         tracer_list.append(tracer)
 

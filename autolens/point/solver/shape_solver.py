@@ -6,7 +6,11 @@ from typing import Tuple, List, Iterator, Optional
 import autoarray as aa
 
 from autoarray.structures.triangles.shape import Shape
-from autoconf.jax_wrapper import register_pytree_node_class
+try:  # pragma: no cover
+    from autoconf.jax_wrapper import register_pytree_node_class
+except ModuleNotFoundError:  # pragma: no cover
+    def register_pytree_node_class(cls):
+        return cls
 
 from autoarray.structures.triangles.coordinate_array import (
     CoordinateArrayTriangles,

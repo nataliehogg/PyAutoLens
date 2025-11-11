@@ -4,7 +4,12 @@ from typing import Tuple, Optional
 import autoarray as aa
 from autoarray.structures.triangles.shape import Point
 
-from autoconf.jax_wrapper import register_pytree_node_class
+try:  # pragma: no cover - optional dependency
+    from autoconf.jax_wrapper import register_pytree_node_class
+except ModuleNotFoundError:  # pragma: no cover
+    def register_pytree_node_class(cls):
+        return cls
+
 from autogalaxy import OperateDeflections
 from .shape_solver import AbstractSolver
 

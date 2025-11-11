@@ -6,11 +6,13 @@ from typing import Dict, List, Optional, Type, Union
 import autofit as af
 import autoarray as aa
 import autogalaxy as ag
+from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
 from autogalaxy.profiles.geometry_profiles import GeometryProfile
 from autogalaxy.profiles.light.snr import LightProfileSNR
 
 from autolens.lens import tracer_util
+from autolens.lens.line_of_sight import LineOfSightBase
 
 
 class Tracer(ABC, ag.OperateImageGalaxies, ag.OperateDeflections):
@@ -18,6 +20,7 @@ class Tracer(ABC, ag.OperateImageGalaxies, ag.OperateDeflections):
         self,
         galaxies: Union[List[ag.Galaxy], af.ModelInstance],
         cosmology: ag.cosmo.LensingCosmology = None,
+        line_of_sight: Optional[LineOfSightBase] = None,
     ):
         """
         Performs gravitational lensing ray-tracing calculations based on an input list of galaxies and a cosmology.
@@ -53,6 +56,45 @@ class Tracer(ABC, ag.OperateImageGalaxies, ag.OperateDeflections):
         self.galaxies = galaxies
 
         self.cosmology = cosmology or ag.cosmo.Planck15()
+        self.line_of_sight = line_of_sight
+        self._los_mass_plane_index = None
+
+        if self.line_of_sight is not None:
+            self._validate_line_of_sight_support()
+
+    def _validate_line_of_sight_support(self):
+        """
+        Ensures that LOS corrections are only enabled for single deflector-plane configurations.
+        """
+
+        planes = self.planes
+
+        if len(planes) < 2:
+            raise ValueError(
+                "Line-of-sight corrections require at least one lens and one source plane."
+            )
+
+        mass_plane_indices = [
+            index
+            for index, galaxies in enumerate(planes)
+            if any(galaxy.has(cls=MassProfile) for galaxy in galaxies)
+        ]
+
+        if len(mass_plane_indices) != 1:
+            raise ValueError(
+                "Line-of-sight corrections currently support exactly one deflector plane."
+            )
+
+        if mass_plane_indices[0] != 0:
+            raise ValueError(
+                "The single deflector plane must be the closest plane to the observer to use line-of-sight corrections."
+            )
+
+        self._los_mass_plane_index = mass_plane_indices[0]
+
+    @property
+    def has_line_of_sight(self) -> bool:
+        return self.line_of_sight is not None
 
     @property
     def galaxies_ascending_redshift(self) -> List[ag.Galaxy]:
@@ -127,6 +169,10 @@ class Tracer(ABC, ag.OperateImageGalaxies, ag.OperateDeflections):
             galaxies=self.galaxies_ascending_redshift,
             plane_redshifts=self.plane_redshifts,
         )
+
+    @property
+    def _mass_galaxies(self) -> List[ag.Galaxy]:
+        return [galaxy for galaxy in self.galaxies if galaxy.has(cls=MassProfile)]
 
     @classmethod
     def sliced_tracer_from(
@@ -256,6 +302,11 @@ class Tracer(ABC, ag.OperateImageGalaxies, ag.OperateDeflections):
             A list of 2D (y,x) grids each of which are the input grid ray-traced to a redshift of the input list of
             planes.
         """
+
+        if self.has_line_of_sight:
+            return self._los_traced_grid_2d_list_from(
+                grid=grid, xp=xp, plane_index_limit=plane_index_limit
+            )
 
         grid_2d_list = tracer_util.traced_grid_2d_list_from(
             planes=self.planes,
@@ -643,9 +694,12 @@ class Tracer(ABC, ag.OperateImageGalaxies, ag.OperateDeflections):
         grid
             The 2D (y, x) coordinates where values of the deflections are evaluated.
         """
-        if self.total_planes > 1:
-            return self.deflections_between_planes_from(grid=grid, xp=xp)
-        return self.deflections_of_planes_summed_from(grid=grid, xp=xp)
+        if not self.has_line_of_sight:
+            if self.total_planes > 1:
+                return self.deflections_between_planes_from(grid=grid, xp=xp)
+            return self.deflections_of_planes_summed_from(grid=grid, xp=xp)
+
+        return self._los_deflections_yx_2d_from(grid=grid, xp=xp)
 
     @aa.grid_dec.to_vector_yx
     def deflections_of_planes_summed_from(
@@ -713,6 +767,13 @@ class Tracer(ABC, ag.OperateImageGalaxies, ag.OperateDeflections):
 
         return traced_grids_list[plane_i] - traced_grids_list[plane_j]
 
+    def hessian_from(self, grid, buffer: float = 0.01, deflections_func=None):
+        if not self.has_line_of_sight:
+            return super().hessian_from(
+                grid=grid, buffer=buffer, deflections_func=deflections_func
+            )
+        return self._los_hessian(grid=grid, buffer=buffer, xp=np)
+
     @aa.grid_dec.to_array
     def convergence_2d_from(self, grid: aa.type.Grid2DLike, xp=np) -> aa.Array2D:
         """
@@ -766,6 +827,35 @@ class Tracer(ABC, ag.OperateImageGalaxies, ag.OperateDeflections):
         return sum(
             [galaxy.potential_2d_from(grid=grid, xp=xp) for galaxy in self.galaxies]
         )
+
+    def time_delay_geometry_term_from(self, grid):
+        if not self.has_line_of_sight:
+            return super().time_delay_geometry_term_from(grid=grid)
+
+        geometry = self._los_geometry_term(grid=grid, xp=np)
+        return self._array_like(grid, geometry)
+
+    def fermat_potential_from(self, grid):
+        if not self.has_line_of_sight:
+            return super().fermat_potential_from(grid=grid)
+
+        xp = np
+        geometry = self._los_geometry_term(grid=grid, xp=xp)
+        params = self._line_of_sight_parameters()
+        grid_values = self._grid_values_as_array(grid, xp)
+
+        grid_d_values = self._distort_grid_values(
+            grid_values,
+            kappa=params["kappa_od"],
+            gamma1=params["gamma1_od"],
+            gamma2=params["gamma2_od"],
+            omega=params["omega_od"],
+            xp=xp,
+        )
+        grid_d = self._grid_irregular_from_values(grid_d_values)
+        potential = self._mass_potential_from(grid=grid_d, xp=xp)
+
+        return self._array_like(grid, geometry - potential)
 
     @aa.grid_dec.to_array
     def time_delays_from(self, grid: aa.type.Grid2DLike, xp=np) -> aa.Array2D:
@@ -1147,6 +1237,300 @@ class Tracer(ABC, ag.OperateImageGalaxies, ag.OperateDeflections):
             for galaxy in galaxies:
                 if profile_name in galaxy.__dict__:
                     return plane_index
+
+    # ------------------------------------------------------------------
+    # Line-of-sight helper utilities
+    # ------------------------------------------------------------------
+
+    def _los_traced_grid_2d_list_from(
+        self, grid: aa.type.Grid2DLike, xp=np, plane_index_limit: Optional[int] = None
+    ) -> List[aa.type.Grid2DLike]:
+        traced_grids = [grid]
+
+        if plane_index_limit == 0:
+            return traced_grids
+
+        source_values = self._source_plane_coordinates(grid=grid, xp=xp)
+        traced_grids.append(self._grid_like(grid, source_values))
+
+        if plane_index_limit is not None and plane_index_limit < len(traced_grids) - 1:
+            return traced_grids[: plane_index_limit + 1]
+
+        return traced_grids
+
+    def _los_deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, xp=np):
+        params = self._line_of_sight_parameters()
+        grid_values = self._grid_values_as_array(grid, xp)
+
+        grid_d_values = self._distort_grid_values(
+            grid_values,
+            kappa=params["kappa_od"],
+            gamma1=params["gamma1_od"],
+            gamma2=params["gamma2_od"],
+            omega=params["omega_od"],
+            xp=xp,
+        )
+
+        grid_d = self._grid_irregular_from_values(grid_d_values)
+        deflections = self._mass_deflections_from(grid=grid_d, xp=xp)
+
+        f_y, f_x = deflections[:, 0], deflections[:, 1]
+        f_y, f_x = self._distort_vectors_yx(
+            f_y,
+            f_x,
+            kappa=params["kappa_ds"],
+            gamma1=params["gamma1_ds"],
+            gamma2=params["gamma2_ds"],
+            omega=params["omega_ds"],
+            xp=xp,
+        )
+
+        grid_os_values = self._distort_grid_values(
+            grid_values,
+            kappa=params["kappa_os"],
+            gamma1=params["gamma1_os"],
+            gamma2=params["gamma2_os"],
+            omega=params["omega_os"],
+            xp=xp,
+        )
+
+        correction = grid_values - grid_os_values
+        total_y = f_y + correction[:, 0]
+        total_x = f_x + correction[:, 1]
+
+        return xp.stack([total_y, total_x], axis=-1)
+
+    def _line_of_sight_parameters(self) -> Dict[str, float]:
+        if self.line_of_sight is None:
+            return {}
+        return self.line_of_sight.parameters
+
+    def _distort_grid_values(
+        self,
+        grid_values,
+        kappa: float,
+        gamma1: float,
+        gamma2: float,
+        omega: float,
+        xp=np,
+    ):
+        x = grid_values[:, 1]
+        y = grid_values[:, 0]
+        x_new, y_new = self.line_of_sight.distort_vector(
+            x=x,
+            y=y,
+            kappa=kappa,
+            gamma1=gamma1,
+            gamma2=gamma2,
+            omega=omega,
+            xp=xp,
+        )
+        return xp.stack([y_new, x_new], axis=-1)
+
+    def _distort_vectors_yx(
+        self,
+        values_y,
+        values_x,
+        kappa: float,
+        gamma1: float,
+        gamma2: float,
+        omega: float,
+        xp=np,
+    ):
+        x_new, y_new = self.line_of_sight.distort_vector(
+            x=values_x,
+            y=values_y,
+            kappa=kappa,
+            gamma1=gamma1,
+            gamma2=gamma2,
+            omega=omega,
+            xp=xp,
+        )
+        return y_new, x_new
+
+    def _grid_like(self, reference_grid, values):
+        values = np.asarray(values)
+        if isinstance(reference_grid, aa.Grid2D):
+            return aa.Grid2D(values=values, mask=reference_grid.mask)
+        if isinstance(reference_grid, aa.Grid2DIrregular):
+            return aa.Grid2DIrregular(values=values)
+        return values
+
+    def _array_like(self, reference_grid, values):
+        values = np.asarray(values)
+        if isinstance(reference_grid, aa.Grid2D):
+            return aa.Array2D(values=values, mask=reference_grid.mask)
+        if isinstance(reference_grid, aa.Grid2DIrregular):
+            return aa.ArrayIrregular(values=values)
+        return values
+
+    def _grid_irregular_from_values(self, values):
+        return aa.Grid2DIrregular(values=np.asarray(values))
+
+    def _mass_deflections_from(self, grid: aa.type.Grid2DLike, xp=np):
+        total = None
+        for galaxy in self._mass_galaxies:
+            values = self._to_xp_array(
+                galaxy.deflections_yx_2d_from(grid=grid, xp=xp), xp=xp
+            )
+            if total is None:
+                total = values
+            else:
+                total = total + values
+
+        if total is None:
+            return xp.zeros((grid.shape[0], 2))
+        return total
+
+    def _mass_potential_from(self, grid: aa.type.Grid2DLike, xp=np):
+        total = None
+        for galaxy in self._mass_galaxies:
+            values = self._to_xp_array(
+                galaxy.potential_2d_from(grid=grid, xp=xp), xp=xp
+            )
+            if total is None:
+                total = values
+            else:
+                total = total + values
+
+        if total is None:
+            return xp.zeros(grid.shape[0])
+        return total
+
+    def _to_xp_array(self, values, xp):
+        if hasattr(values, "array"):
+            values = values.array
+        return xp.asarray(values)
+
+    def _grid_values_as_array(self, grid, xp):
+        if hasattr(grid, "array"):
+            return xp.asarray(grid.array)
+        return xp.asarray(grid)
+
+    def _source_plane_coordinates(self, grid: aa.type.Grid2DLike, xp=np):
+        deflections = xp.asarray(self.deflections_yx_2d_from(grid=grid, xp=xp))
+        grid_values = self._grid_values_as_array(grid, xp)
+        return grid_values - deflections
+
+    def _los_geometry_term(self, grid: aa.type.Grid2DLike, xp=np):
+        params = self._line_of_sight_parameters()
+        matrices = self._los_matrices(params, xp=xp)
+        theta = self._grid_values_as_array(grid, xp)
+        beta = xp.asarray(self._source_plane_coordinates(grid=grid, xp=xp))
+
+        theta_xy = xp.stack([theta[:, 1], theta[:, 0]], axis=-1)
+        beta_xy = xp.stack([beta[:, 1], beta[:, 0]], axis=-1)
+
+        b_xy = xp.einsum("ij,nj->ni", matrices["A_os_inv"], beta_xy)
+        f_xy = theta_xy - b_xy
+        a_xy = xp.einsum("ij,nj->ni", matrices["A_LOS"], f_xy)
+
+        return 0.5 * xp.sum(f_xy * a_xy, axis=1)
+
+    def _los_hessian(self, grid, buffer: float, xp=np):
+        params = self._line_of_sight_parameters()
+        grid_values = self._grid_values_as_array(grid, xp)
+        grid_d_values = self._distort_grid_values(
+            grid_values,
+            kappa=params["kappa_od"],
+            gamma1=params["gamma1_od"],
+            gamma2=params["gamma2_od"],
+            omega=params["omega_od"],
+            xp=xp,
+        )
+        grid_d = self._grid_irregular_from_values(grid_d_values)
+
+        base_arrays = self._mass_hessian_from(grid=grid_d, buffer=buffer, xp=xp)
+
+        f_xx = base_arrays[3]
+        f_xy = base_arrays[1]
+        f_yx = base_arrays[2]
+        f_yy = base_arrays[0]
+
+        f_xx, f_xy, f_yx, f_yy = self.line_of_sight.left_multiply(
+            f_xx,
+            f_xy,
+            f_yx,
+            f_yy,
+            kappa=params["kappa_ds"],
+            gamma1=params["gamma1_ds"],
+            gamma2=params["gamma2_ds"],
+            omega=params["omega_ds"],
+            xp=xp,
+        )
+
+        f_xx, f_xy, f_yx, f_yy = self.line_of_sight.right_multiply(
+            f_xx,
+            f_xy,
+            f_yx,
+            f_yy,
+            kappa=params["kappa_od"],
+            gamma1=params["gamma1_od"],
+            gamma2=params["gamma2_od"],
+            omega=params["omega_od"],
+            xp=xp,
+        )
+
+        f_xx = f_xx + params["kappa_os"] + params["gamma1_os"]
+        f_xy = f_xy + params["gamma2_os"] - params["omega_os"]
+        f_yx = f_yx + params["gamma2_os"] + params["omega_os"]
+        f_yy = f_yy + params["kappa_os"] - params["gamma1_os"]
+
+        return f_yy, f_xy, f_yx, f_xx
+
+    def _los_matrices(self, params: Dict[str, float], xp=np):
+        A_od = self.line_of_sight.distortion_matrix(
+            kappa=params["kappa_od"],
+            gamma1=params["gamma1_od"],
+            gamma2=params["gamma2_od"],
+            omega=params["omega_od"],
+            xp=xp,
+        )
+        A_os = self.line_of_sight.distortion_matrix(
+            kappa=params["kappa_os"],
+            gamma1=params["gamma1_os"],
+            gamma2=params["gamma2_os"],
+            omega=params["omega_os"],
+            xp=xp,
+        )
+        A_ds = self.line_of_sight.distortion_matrix(
+            kappa=params["kappa_ds"],
+            gamma1=params["gamma1_ds"],
+            gamma2=params["gamma2_ds"],
+            omega=params["omega_ds"],
+            xp=xp,
+        )
+
+        A_ds_inv = xp.linalg.inv(A_ds)
+        A_os_inv = xp.linalg.inv(A_os)
+        A_los = xp.matmul(xp.matmul(A_od.T, A_ds_inv), A_os)
+
+        return {
+            "A_od": A_od,
+            "A_os": A_os,
+            "A_ds": A_ds,
+            "A_ds_inv": A_ds_inv,
+            "A_os_inv": A_os_inv,
+            "A_LOS": A_los,
+        }
+
+    def _mass_hessian_from(self, grid: aa.type.Grid2DLike, buffer: float, xp=np):
+        totals = None
+        for galaxy in self._mass_galaxies:
+            components = galaxy.hessian_from(grid=grid, buffer=buffer)
+            arrays = [self._to_xp_array(component, xp) for component in components]
+            if totals is None:
+                totals = arrays
+            else:
+                totals = [
+                    total + array for total, array in zip(totals, arrays)
+                ]
+
+        if totals is None:
+            zeros = xp.zeros(grid.shape[0])
+            totals = [zeros, zeros, zeros, zeros]
+
+        return totals
 
     def set_snr_of_snr_light_profiles(
         self,

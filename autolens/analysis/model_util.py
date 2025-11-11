@@ -1,7 +1,10 @@
 import autofit as af
 import autolens as al
 
-from autogalaxy.analysis.model_util import mge_model_from
+try:  # pragma: no cover - optional dependency
+    from autogalaxy.analysis.model_util import mge_model_from  # noqa: F401
+except ModuleNotFoundError:  # pragma: no cover
+    mge_model_from = None
 
 
 def simulator_start_here_model_from(

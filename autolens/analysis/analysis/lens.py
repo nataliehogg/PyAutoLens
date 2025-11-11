@@ -87,11 +87,15 @@ class AnalysisLens:
             if getattr(instance, "extra_galaxies", None) is not None:
                 return Tracer(
                     galaxies=instance.galaxies + instance.extra_galaxies,
+                    line_of_sight=getattr(instance, "line_of_sight", None),
                 )
+
+        line_of_sight = getattr(instance, "line_of_sight", None)
 
         return Tracer(
             galaxies=instance.galaxies,
             cosmology=cosmology,
+            line_of_sight=line_of_sight,
         )
 
     def log_likelihood_penalty_from(

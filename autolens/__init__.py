@@ -1,3 +1,4 @@
+from autoconf import jax_wrapper
 from autoconf.dictable import from_dict, from_json, output_to_json, to_dict
 from autoarray import preprocess
 from autoarray.dataset.imaging.w_tilde import WTildeImaging
@@ -29,6 +30,7 @@ from autoarray.inversion.pixelization.border_relocator import BorderRelocator
 from autoarray.operators.transformer import TransformerDFT
 from autoarray.operators.transformer import TransformerNUFFT
 from autoarray.preloads import Preloads
+from autoarray.preloads import mapper_indices_from
 from autoarray.structures.arrays.uniform_1d import Array1D
 from autoarray.structures.arrays.uniform_2d import Array2D
 from autoarray.structures.arrays.rgb import Array2DRGB
@@ -52,7 +54,9 @@ from autoarray.structures.visibilities import VisibilitiesNoiseMap
 
 from autogalaxy import cosmology as cosmo
 from autogalaxy.analysis.adapt_images.adapt_images import AdaptImages
-from autogalaxy.analysis.adapt_images.adapt_image_maker import AdaptImageMaker
+from autogalaxy.analysis.adapt_images.adapt_images import (
+    galaxy_name_image_dict_via_result_from,
+)
 from autogalaxy.gui.clicker import Clicker
 from autogalaxy.gui.scribbler import Scribbler
 from autogalaxy.galaxy.galaxy import Galaxy
@@ -117,8 +121,6 @@ from .point.solver.shape_solver import ShapeSolver
 from .quantity.fit_quantity import FitQuantity
 from .quantity.model.analysis import AnalysisQuantity
 
-from .analysis.preloads import mapper_indices_from
-
 from . import exc
 from . import mock as m
 from . import util
@@ -132,4 +134,4 @@ from autoconf.fitsable import hdu_list_for_output_from
 
 conf.instance.register(__file__)
 
-__version__ = "2025.10.21.1"
+__version__ = "2025.11.18.1"

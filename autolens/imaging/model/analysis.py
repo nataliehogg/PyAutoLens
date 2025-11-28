@@ -1,6 +1,5 @@
 import logging
 
-
 import autofit as af
 import autogalaxy as ag
 
@@ -18,33 +17,6 @@ class AnalysisImaging(AnalysisDataset):
 
     Result = ResultImaging
     Visualizer = VisualizerImaging
-
-    def modify_before_fit(self, paths: af.DirectoryPaths, model: af.Collection):
-        """
-        This function is called immediately before the non-linear search begins and performs final tasks and checks 
-        before it begins.
-
-        This function:
-
-        - Checks that the adapt-dataset is consistent with previous adapt-datasets if the model-fit is being
-          resumed from a previous run.
-
-        - Checks the model and raises exceptions if certain critieria are not met.
-
-        Once inherited from it also visualizes objects which do not change throughout the model fit like the dataset.
-
-        Parameters
-        ----------
-        paths
-            The paths object which manages all paths, e.g. where the non-linear search outputs are stored,
-            visualization and the pickled objects used by the aggregator output by this function.
-        model
-            The model object, which includes model components representing the galaxies that are fitted to
-            the imaging data.
-        """
-        super().modify_before_fit(paths=paths, model=model)
-
-        return self
 
     def log_likelihood_function(self, instance: af.ModelInstance) -> float:
         """
@@ -86,10 +58,17 @@ class AnalysisImaging(AnalysisDataset):
         """
 
         log_likelihood_penalty = self.log_likelihood_penalty_from(
-            instance=instance
+            instance=instance,
+            xp=self._xp
         )
 
-        return self.fit_from(instance=instance).figure_of_merit - log_likelihood_penalty
+        if self.use_jax:
+            return self.fit_from(instance=instance).figure_of_merit - log_likelihood_penalty
+
+        try:
+            return self.fit_from(instance=instance).log_likelihood - log_likelihood_penalty
+        except Exception as e:
+            raise af.exc.FitException
 
     def fit_from(
         self,
@@ -130,7 +109,8 @@ class AnalysisImaging(AnalysisDataset):
             dataset_model=dataset_model,
             adapt_images=adapt_images,
             settings_inversion=self.settings_inversion,
-            preloads=self.preloads
+            preloads=self.preloads,
+            xp=self._xp
         )
 
     def save_attributes(self, paths: af.DirectoryPaths):

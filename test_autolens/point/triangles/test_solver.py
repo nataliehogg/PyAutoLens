@@ -68,14 +68,19 @@ def test_trivial(
 
 
 def test_real_example_jax(grid, tracer):
-    jax_solver = PointSolver.for_grid(
-        grid=grid,
-        pixel_scale_precision=0.001,
-    )
+
+    import jax.numpy as jnp
+
+    jax_solver = PointSolver.for_grid(grid=grid, pixel_scale_precision=0.001, xp=jnp)
 
     result = jax_solver.solve(
-        tracer=tracer,
-        source_plane_coordinate=(0.07, 0.07),
+        tracer=tracer, source_plane_coordinate=(0.07, 0.07), remove_infinities=True
+    )
+
+    assert len(result) == 5
+
+    result = jax_solver.solve(
+        tracer=tracer, source_plane_coordinate=(0.07, 0.07), remove_infinities=False
     )
 
     assert len(result) == 15

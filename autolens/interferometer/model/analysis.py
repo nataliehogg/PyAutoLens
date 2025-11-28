@@ -1,20 +1,16 @@
 import logging
 import numpy as np
-from typing import Dict, Optional, Tuple, Union
+from typing import Optional
 
 import autofit as af
 import autoarray as aa
 import autogalaxy as ag
-
-from autoarray.exc import PixelizationException
 
 from autolens.analysis.analysis.dataset import AnalysisDataset
 from autolens.analysis.positions import PositionsLH
 from autolens.interferometer.model.result import ResultInterferometer
 from autolens.interferometer.model.visualizer import VisualizerInterferometer
 from autolens.interferometer.fit_interferometer import FitInterferometer
-
-from autolens import exc
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +25,13 @@ class AnalysisInterferometer(AnalysisDataset):
         self,
         dataset,
         positions_likelihood_list: Optional[PositionsLH] = None,
-        adapt_image_maker: Optional[ag.AdaptImageMaker] = None,
+        adapt_images: Optional[ag.AdaptImages] = None,
         cosmology: ag.cosmo.LensingCosmology = None,
         settings_inversion: aa.SettingsInversion = None,
         preloads: aa.Preloads = None,
         raise_inversion_positions_likelihood_exception: bool = True,
         title_prefix: str = None,
+        use_jax: bool = True,
     ):
         """
         Analysis classes are used by PyAutoFit to fit a model to a dataset via a non-linear search.
@@ -80,39 +77,18 @@ class AnalysisInterferometer(AnalysisDataset):
         super().__init__(
             dataset=dataset,
             positions_likelihood_list=positions_likelihood_list,
-            adapt_image_maker=adapt_image_maker,
+            adapt_images=adapt_images,
             cosmology=cosmology,
             settings_inversion=settings_inversion,
             preloads=preloads,
             raise_inversion_positions_likelihood_exception=raise_inversion_positions_likelihood_exception,
             title_prefix=title_prefix,
+            use_jax=use_jax,
         )
 
     @property
     def interferometer(self):
         return self.dataset
-
-    def modify_before_fit(self, paths: af.DirectoryPaths, model: af.Collection):
-        """
-        This function is called immediately before the non-linear search begins and performs final tasks and checks
-        before it begins.
-
-        This function checks that the adapt-dataset is consistent with previous adapt-datasets if the model-fit is
-        being resumed from a previous run, and it visualizes objects which do not change throughout the model fit
-        like the dataset.
-
-        Parameters
-        ----------
-        paths
-            The paths object which manages all paths, e.g. where the non-linear search outputs are stored,
-            visualization and the pickled objects used by the aggregator output by this function.
-        model
-            The model object, which includes model components representing the galaxies that are fitted to
-            the imaging data.
-        """
-        super().modify_before_fit(paths=paths, model=model)
-
-        return self
 
     def log_likelihood_function(self, instance):
         """
@@ -153,14 +129,13 @@ class AnalysisInterferometer(AnalysisDataset):
             The log likelihood indicating how well this model instance fitted the interferometer data.
         """
 
-        log_likelihood_penalty = self.log_likelihood_penalty_from(instance=instance)
+        log_likelihood_penalty = self.log_likelihood_penalty_from(
+            instance=instance, xp=self._xp
+        )
 
         return self.fit_from(instance=instance).figure_of_merit - log_likelihood_penalty
 
-    def fit_from(
-        self,
-        instance: af.ModelInstance,
-    ) -> FitInterferometer:
+    def fit_from(self, instance: af.ModelInstance) -> FitInterferometer:
         """
         Given a model instance create a `FitInterferometer` object.
 
@@ -196,6 +171,7 @@ class AnalysisInterferometer(AnalysisDataset):
             adapt_images=adapt_images,
             settings_inversion=self.settings_inversion,
             preloads=self.preloads,
+            xp=self._xp,
         )
 
     def save_attributes(self, paths: af.DirectoryPaths):

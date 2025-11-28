@@ -1,5 +1,6 @@
-import os
 import logging
+import numpy as np
+import os
 from typing import List, Optional
 
 from autoconf import conf
@@ -27,12 +28,13 @@ class AnalysisDataset(AgAnalysisDataset, AnalysisLens):
         self,
         dataset,
         positions_likelihood_list: Optional[List[PositionsLH]] = None,
-        adapt_image_maker: Optional[ag.AdaptImageMaker] = None,
+        adapt_images: Optional[ag.AdaptImages] = None,
         cosmology: ag.cosmo.LensingCosmology = None,
         settings_inversion: aa.SettingsInversion = None,
         preloads: aa.Preloads = None,
         raise_inversion_positions_likelihood_exception: bool = True,
         title_prefix: str = None,
+        use_jax: bool = True,
         **kwargs,
     ):
         """
@@ -70,11 +72,12 @@ class AnalysisDataset(AgAnalysisDataset, AnalysisLens):
 
         super().__init__(
             dataset=dataset,
-            adapt_image_maker=adapt_image_maker,
+            adapt_images=adapt_images,
             cosmology=cosmology,
             settings_inversion=settings_inversion,
             preloads=preloads,
             title_prefix=title_prefix,
+            use_jax=use_jax,
             **kwargs,
         )
 
@@ -118,6 +121,8 @@ class AnalysisDataset(AgAnalysisDataset, AnalysisLens):
         super().modify_before_fit(paths=paths, model=model)
 
         self.raise_exceptions(model=model)
+
+        return self
 
     def raise_exceptions(self, model):
         has_pix = model.has_model(cls=(aa.Pixelization,)) or model.has_instance(

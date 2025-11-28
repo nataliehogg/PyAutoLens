@@ -428,17 +428,20 @@ class FitImagingPlotter(Plotter):
         self.mat_plot_2d.cmap.kwargs.pop("vmax")
 
         self.residuals_symmetric_cmap = False
-        self.set_title(label="Lens Light Subtracted Image")
+        self.set_title(label="Lens Light Subtracted")
         self.figures_2d(normalized_residual_map=True)
+
+        self.mat_plot_2d.cmap.kwargs["vmin"] = 0.0
+        self.set_title(label="Subtracted Image Zero Minimum")
+        self.figures_2d(normalized_residual_map=True)
+        self.mat_plot_2d.cmap.kwargs.pop("vmin")
 
         self.residuals_symmetric_cmap = True
         self.set_title(label="Normalized Residual Map")
         self.figures_2d(normalized_residual_map=True)
         self.set_title(label=None)
 
-        self.figures_2d(chi_squared_map=True)
-
-        self.mat_plot_2d.output.subplot_to_figure(auto_filename="subplot_fit")
+        self.mat_plot_2d.output.subplot_to_figure(auto_filename="subplot_fit_x1_plane")
         self.close_subplot_figure()
 
     def subplot_fit_log10_x1_plane(self):
@@ -465,7 +468,7 @@ class FitImagingPlotter(Plotter):
         self.mat_plot_2d.cmap.kwargs.pop("vmax")
 
         self.residuals_symmetric_cmap = False
-        self.set_title(label="Lens Light Subtracted Image")
+        self.set_title(label="Lens Light Subtracted")
         self.figures_2d(normalized_residual_map=True)
 
         self.residuals_symmetric_cmap = True
@@ -516,7 +519,7 @@ class FitImagingPlotter(Plotter):
 
         self.mat_plot_2d.cmap.kwargs["vmin"] = 0.0
 
-        self.set_title(label="Lens Light Subtracted Image")
+        self.set_title(label="Lens Light Subtracted")
         self.figures_2d_of_planes(
             plane_index=plane_index,
             subtracted_image=True,
@@ -524,7 +527,7 @@ class FitImagingPlotter(Plotter):
             remove_critical_caustic=True,
         )
 
-        self.set_title(label="Source Model Image (Image Plane)")
+        self.set_title(label="Source Model Image")
         self.figures_2d_of_planes(
             plane_index=plane_index,
             model_image=True,
@@ -548,7 +551,7 @@ class FitImagingPlotter(Plotter):
         self.mat_plot_2d.cmap.kwargs["vmin"] = -1.0
         self.mat_plot_2d.cmap.kwargs["vmax"] = 1.0
 
-        self.set_title(label="Normalized Residual Map (1 sigma)")
+        self.set_title(label=r"Normalized Residual Map $1\sigma$")
         self.figures_2d(normalized_residual_map=True)
         self.set_title(label=None)
 
@@ -568,7 +571,8 @@ class FitImagingPlotter(Plotter):
         self.set_title(label=None)
 
         self.mat_plot_2d.output.subplot_to_figure(
-            auto_filename=f"subplot_fit{plane_index_tag}", also_show=self.mat_plot_2d.quick_update
+            auto_filename=f"subplot_fit{plane_index_tag}",
+           # also_show=self.mat_plot_2d.quick_update
         )
         self.close_subplot_figure()
 
@@ -620,12 +624,12 @@ class FitImagingPlotter(Plotter):
 
         self.mat_plot_2d.cmap.kwargs["vmin"] = 0.0
 
-        self.set_title(label="Lens Light Subtracted Image")
+        self.set_title(label="Lens Light Subtracted")
         self.figures_2d_of_planes(
             plane_index=plane_index, subtracted_image=True, use_source_vmax=True, remove_critical_caustic=True
         )
 
-        self.set_title(label="Source Model Image (Image Plane)")
+        self.set_title(label="Source Model Image")
         self.figures_2d_of_planes(
             plane_index=plane_index, model_image=True, use_source_vmax=True, remove_critical_caustic=True
         )
@@ -648,7 +652,7 @@ class FitImagingPlotter(Plotter):
         self.mat_plot_2d.cmap.kwargs["vmin"] = -1.0
         self.mat_plot_2d.cmap.kwargs["vmax"] = 1.0
 
-        self.set_title(label="Normalized Residual Map (1 sigma)")
+        self.set_title(label=r"Normalized Residual Map $1\sigma$")
         self.figures_2d(normalized_residual_map=True)
         self.set_title(label=None)
 

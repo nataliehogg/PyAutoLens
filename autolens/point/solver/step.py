@@ -2,12 +2,10 @@ import logging
 from dataclasses import dataclass
 
 import autoarray as aa
-from autoarray.numpy_wrapper import register_pytree_node_class
 
 logger = logging.getLogger(__name__)
 
 
-@register_pytree_node_class
 @dataclass
 class Step:
     """

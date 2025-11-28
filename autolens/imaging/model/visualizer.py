@@ -1,3 +1,5 @@
+import logging
+
 from autoarray import exc
 
 import autofit as af
@@ -8,6 +10,7 @@ from autolens.imaging.model.plotter_interface import PlotterInterfaceImaging
 from autolens.lens import tracer_util
 from autolens import exc
 
+logger = logging.getLogger(__name__)
 
 class VisualizerImaging(af.Visualizer):
     @staticmethod
@@ -91,7 +94,6 @@ class VisualizerImaging(af.Visualizer):
             An instance of the model that is being fitted to the data by this analysis (whose parameters have been set
             via a non-linear search).
         """
-
         fit = analysis.fit_from(instance=instance)
         tracer = fit.tracer_linear_light_profiles_to_light_profiles
 
@@ -99,7 +101,6 @@ class VisualizerImaging(af.Visualizer):
             tracer=fit.tracer,
             grid=fit.grids.lp.mask.derive_grid.all_false
         )
-
 
         plotter_interface = PlotterInterfaceImaging(
             image_path=paths.image_path,
@@ -136,6 +137,9 @@ class VisualizerImaging(af.Visualizer):
             try:
                 fit.inversion.reconstruction
             except exc.InversionException:
+                logger(
+                    ag.exc.invalid_linear_algebra_for_visualization_message()
+                )
                 return
 
         zoom = ag.Zoom2D(mask=fit.mask)
@@ -224,7 +228,6 @@ class VisualizerImaging(af.Visualizer):
             The model object, which includes model components representing the galaxies that are fitted to
             the imaging data.
         """
-        fff
 
         if analyses is None:
             return

@@ -19,6 +19,7 @@ class AbstractFitPositionsImagePair(AbstractFitPositions, ABC):
         tracer: Tracer,
         solver: PointSolver,
         profile: Optional[ag.ps.Point] = None,
+        xp=np,
     ):
         """
         Abstract class to fit the positions of a point source dataset using a `Tracer` object with an image-plane
@@ -70,6 +71,7 @@ class AbstractFitPositionsImagePair(AbstractFitPositions, ABC):
             tracer=tracer,
             solver=solver,
             profile=profile,
+            xp=xp,
         )
 
     @staticmethod
@@ -102,4 +104,5 @@ class AbstractFitPositionsImagePair(AbstractFitPositions, ABC):
             tracer=self.tracer,
             source_plane_coordinate=self.source_plane_coordinate,
             plane_redshift=self.plane_redshift,
+            remove_infinities=False,
         )

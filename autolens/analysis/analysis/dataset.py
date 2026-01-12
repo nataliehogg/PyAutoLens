@@ -85,6 +85,7 @@ class AnalysisDataset(AgAnalysisDataset, AnalysisLens):
             self=self,
             positions_likelihood_list=positions_likelihood_list,
             cosmology=cosmology,
+            use_jax=use_jax,
         )
 
         self.raise_inversion_positions_likelihood_exception = (
@@ -93,6 +94,9 @@ class AnalysisDataset(AgAnalysisDataset, AnalysisLens):
 
         if os.environ.get("PYAUTOFIT_TEST_MODE") == "1":
             self.raise_inversion_positions_likelihood_exception = False
+
+        # Can be deleted after relevent AutoFIT PR merged
+        self._use_jax = use_jax
 
     def modify_before_fit(self, paths: af.DirectoryPaths, model: af.Collection):
         """

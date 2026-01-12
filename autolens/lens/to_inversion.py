@@ -55,12 +55,12 @@ class TracerToInversion(ag.AbstractToInversion):
             The settings of the inversion, which controls how the linear algebra calculation is performed.
         """
         self.tracer = tracer
-        self.preloads = preloads
 
         super().__init__(
             dataset=dataset,
             adapt_images=adapt_images,
             settings_inversion=settings_inversion,
+            preloads=preloads,
             xp=xp,
         )
 
@@ -194,6 +194,7 @@ class TracerToInversion(ag.AbstractToInversion):
                 galaxies=galaxies,
                 settings_inversion=self.settings_inversion,
                 adapt_images=self.adapt_images,
+                preloads=self.preloads,
                 xp=self._xp,
             )
 
@@ -318,6 +319,8 @@ class TracerToInversion(ag.AbstractToInversion):
                 galaxies=galaxies,
                 adapt_images=self.adapt_images,
                 settings_inversion=self.settings_inversion,
+                preloads=self.preloads,
+                xp=self._xp,
             )
 
             image_plane_mesh_grid_list = to_inversion.image_plane_mesh_grid_list
@@ -361,7 +364,7 @@ class TracerToInversion(ag.AbstractToInversion):
                     try:
                         traced_mesh_grids_list.append(
                             self.tracer.traced_grid_2d_list_from(
-                                grid=image_plane_mesh_grid
+                                grid=image_plane_mesh_grid, xp=self._xp
                             )[plane_index]
                         )
                     except AttributeError:
@@ -413,6 +416,7 @@ class TracerToInversion(ag.AbstractToInversion):
                     galaxies=galaxies,
                     adapt_images=self.adapt_images,
                     settings_inversion=self.settings_inversion,
+                    preloads=self.preloads,
                     xp=self._xp,
                 )
 

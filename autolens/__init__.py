@@ -39,7 +39,6 @@ from autoarray.structures.grids.uniform_1d import Grid1D
 from autoarray.structures.grids.uniform_2d import Grid2D
 from autoarray.structures.grids.irregular_2d import Grid2DIrregular
 from autoarray.structures.mesh.rectangular_2d import Mesh2DRectangular
-from autoarray.structures.mesh.voronoi_2d import Mesh2DVoronoi
 from autoarray.structures.mesh.delaunay_2d import Mesh2DDelaunay
 from autoarray.structures.triangles.shape import Circle
 from autoarray.structures.triangles.shape import Triangle
@@ -134,4 +133,4 @@ from autoconf.fitsable import hdu_list_for_output_from
 
 conf.instance.register(__file__)
 
-__version__ = "2025.11.18.1"
+__version__ = "2025.12.21.1"
